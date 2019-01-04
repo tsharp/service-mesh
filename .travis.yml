@@ -1,0 +1,25 @@
+language: script
+mono: none
+dotnet: 2.1.502
+sudo: false
+
+solution: service-mesh.sln
+
+install:
+ - dotnet restore service-mesh.sln
+ - nuget install xunit.runners -Version 1.9.2 -OutputDirectory testrunner
+
+script:
+ - dotnet build
+ - dotnet test
+
+# safelist
+branches:
+  only:
+  - master
+  - stable
+  - develop
+  - experimental
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
