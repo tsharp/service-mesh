@@ -13,7 +13,7 @@ namespace OrbitalForge.ServiceMesh.Client
         {
             Console.WriteLine("Hello World!");
             Console.WriteLine(typeof(OrbitalForge.ServiceMesh.Core.Rpc.ServiceMesh.ServiceMeshClient));
-            Channel channel = new Channel("127.0.0.1:50051", ChannelCredentials.Insecure);
+            Channel channel = new Channel("172.17.0.2:50051", ChannelCredentials.Insecure);
             var client = new Core.Rpc.ServiceMesh.ServiceMeshClient(channel);
             // RunEventClient(client).Wait();
             Task.WaitAll(
