@@ -1,41 +1,36 @@
 namespace OrbitalForge.ServiceMesh.Core
 {
     using System;
-    using System.Threading;
+    using System.Collections.Concurrent;
     using System.Threading.Tasks;
     using Grpc.Core;
 
     public class ServiceMeshServer : Rpc.ServiceMesh.ServiceMeshBase
     {
-        const int MaxWait = 1000;
+        public int ConnectedWorkers { get => workers.Count; }
 
-        private volatile int connectedWorkers = 0;
-
-        public int ConnectedWorkers { get => connectedWorkers; }
+        private ConcurrentQueue<ServiceMeshWorker> workers = new ConcurrentQueue<ServiceMeshWorker>();
 
         public override async Task EventStream(IAsyncStreamReader<Core.Rpc.StreamingMessage> requestStream, IServerStreamWriter<Core.Rpc.StreamingMessage> responseStream, ServerCallContext context) 
         {
-            Interlocked.Increment(ref connectedWorkers);
+            var worker = new ServiceMeshWorker(requestStream, responseStream);
 
             try 
             {
-                var source = new CancellationTokenSource();
-                var task = requestStream.MoveNext(source.Token);
-                source.CancelAfter(TimeSpan.FromMilliseconds(MaxWait));
+                await worker.InitAsync();
 
-                while(await task) 
+                if(worker.Capabilities.ContainsKey("Listener")) 
                 {
-                    await responseStream.WriteAsync(await OnMessage(requestStream.Current));
-                    task = requestStream.MoveNext(source.Token);
-                    source.CancelAfter(TimeSpan.FromMilliseconds(MaxWait));
+                    workers.Enqueue(worker);
                 }
+
+                await worker.RunAsync(OnMessage);
             }
             catch(Exception ex)
             {
                 Console.Error.WriteLine(ex);
+                throw;
             }
-
-            Interlocked.Decrement(ref connectedWorkers);
         }
 
         // TODO: Implement Keep-Alive Ping

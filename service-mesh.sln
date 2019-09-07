@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "service-mesh-server", "serv
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "service-mesh-httptunnel", "service-mesh-httptunnel\service-mesh-httptunnel.csproj", "{8B33EA17-F9DC-4643-929B-A1B9FE9B0BBD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "service-mesh-httplistener", "service-mesh-httplistener\service-mesh-httplistener.csproj", "{3C8645CD-C648-4B73-A087-957829102A24}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -72,5 +74,17 @@ Global
 		{8B33EA17-F9DC-4643-929B-A1B9FE9B0BBD}.Release|x64.Build.0 = Release|Any CPU
 		{8B33EA17-F9DC-4643-929B-A1B9FE9B0BBD}.Release|x86.ActiveCfg = Release|Any CPU
 		{8B33EA17-F9DC-4643-929B-A1B9FE9B0BBD}.Release|x86.Build.0 = Release|Any CPU
+		{3C8645CD-C648-4B73-A087-957829102A24}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3C8645CD-C648-4B73-A087-957829102A24}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3C8645CD-C648-4B73-A087-957829102A24}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3C8645CD-C648-4B73-A087-957829102A24}.Debug|x64.Build.0 = Debug|Any CPU
+		{3C8645CD-C648-4B73-A087-957829102A24}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3C8645CD-C648-4B73-A087-957829102A24}.Debug|x86.Build.0 = Debug|Any CPU
+		{3C8645CD-C648-4B73-A087-957829102A24}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3C8645CD-C648-4B73-A087-957829102A24}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3C8645CD-C648-4B73-A087-957829102A24}.Release|x64.ActiveCfg = Release|Any CPU
+		{3C8645CD-C648-4B73-A087-957829102A24}.Release|x64.Build.0 = Release|Any CPU
+		{3C8645CD-C648-4B73-A087-957829102A24}.Release|x86.ActiveCfg = Release|Any CPU
+		{3C8645CD-C648-4B73-A087-957829102A24}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

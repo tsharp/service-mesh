@@ -1,7 +1,6 @@
 ﻿namespace OrbitalForge.ServiceMesh.Server.HttpTunnel
 {
     using System;
-    using System.IO;
     using System.Net;
     using System.Net.Sockets;
     using Grpc.Core;
@@ -17,7 +16,7 @@
         {
             Grpc.Core.Server server = new Grpc.Core.Server
             {
-                Services = { Core.Rpc.ServiceMesh.BindService(new Core.ServiceMeshServer()) },
+                Services = { Core.Rpc.ServiceMesh.BindService(new HttpTunnelServer()) },
                 Ports = { new ServerPort(GetLocalIPAddress(), port, ServerCredentials.Insecure) }
             };
 

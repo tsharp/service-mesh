@@ -1,4 +1,4 @@
-﻿namespace OrbitalForge.ServiceMesh.Client
+﻿namespace OrbitalForge.ServiceMesh.HttpListener
 {
     using System;
     using System.Collections.Generic;
