@@ -57,16 +57,22 @@
 
                     var source = new CancellationTokenSource();
                     var task = eventStream.ResponseStream.MoveNext(source.Token);
-                    source.CancelAfter(TimeSpan.FromMilliseconds(50));
+                    source.CancelAfter(TimeSpan.FromMilliseconds(50000));
 
                     HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://www.google.com"));
 
-                    if(await task) 
-                    {
-                        Console.WriteLine($"Response: {eventStream.ResponseStream.Current.RequestId}");
-                    } else {
-                        Console.WriteLine("Response Not Recieved In A Timely Manner!");
-                        throw new TimeoutException();
+                    try {
+                        if(await task) 
+                        {
+                            Console.WriteLine($"Response: {eventStream.ResponseStream.Current.RequestId}");
+                        } else {
+                            Console.WriteLine("Response Not Recieved In A Timely Manner!");
+                            throw new TimeoutException();
+                        }
+                    } catch(Grpc.Core.RpcException ex) {
+                        Console.WriteLine(ex);
+                        Console.WriteLine(ex.Message);
+                        Console.WriteLine(ex.StackTrace);
                     }
                 }
 

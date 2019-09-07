@@ -9,7 +9,7 @@ namespace OrbitalForge.ServiceMesh.Core
     using Grpc.Core;
     using static OrbitalForge.ServiceMesh.Core.Rpc.StreamingMessage;
 
-    internal class ServiceMeshWorker
+    public class ServiceMeshWorker
     {
         const int MaxWait = 1000;
 
@@ -21,6 +21,14 @@ namespace OrbitalForge.ServiceMesh.Core
         public IReadOnlyDictionary<string, string> Capabilities { get; private set; }
 
         public string HostVersion { get; private set; }
+
+        public bool IsListener 
+        {
+            get 
+            {
+                return Capabilities.ContainsKey("Listener");
+            }
+        }
 
         public ServiceMeshWorker(IAsyncStreamReader<Core.Rpc.StreamingMessage> requestStream, IServerStreamWriter<Core.Rpc.StreamingMessage> responseStream)
         {
@@ -55,6 +63,14 @@ namespace OrbitalForge.ServiceMesh.Core
             isInitialized = true;      
         }
 
+        public async Task<Core.Rpc.StreamingMessage> SendRequestAsync(Core.Rpc.StreamingMessage request) 
+        {
+            // Since these may be out of order - this needs to be synchronized.
+            await responseStream.WriteAsync(request);
+            await requestStream.MoveNext(CancellationToken.None);
+            return requestStream.Current;
+        }
+
         public async Task RunAsync(Func<Core.Rpc.StreamingMessage, Task<Core.Rpc.StreamingMessage>> messageCallback)
         {
             if(!isInitialized) 
@@ -62,16 +78,26 @@ namespace OrbitalForge.ServiceMesh.Core
                 throw new InvalidProgramException("You must initialize the worker before calling RunAsync.");
             }
 
-            var source = new CancellationTokenSource();
-            var task = requestStream.MoveNext(source.Token);
-            source.CancelAfter(TimeSpan.FromMilliseconds(MaxWait));
-
-            while(await task) 
+            while(await requestStream.MoveNext(CancellationToken.None)) 
             {
+                if(requestStream.Current.ContentCase == ContentOneofCase.WorkerHeartbeat) 
+                {
+                    Console.WriteLine("Observed Heartbeat");
+                    continue;
+                }
+
                 await responseStream.WriteAsync(await messageCallback(requestStream.Current));
-                task = requestStream.MoveNext(source.Token);
-                source.CancelAfter(TimeSpan.FromMilliseconds(MaxWait));
             }
+
+            // var source = new CancellationTokenSource();
+            // var task = requestStream.MoveNext(source.Token);
+            // source.CancelAfter(TimeSpan.FromMilliseconds(MaxWait));
+
+            // while(await task) 
+            // {
+            //     task = requestStream.MoveNext(source.Token);
+            //     source.CancelAfter(TimeSpan.FromMilliseconds(MaxWait));
+            // }
         }
     }
 }
