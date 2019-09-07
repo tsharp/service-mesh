@@ -4,6 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Grpc.Core;
 using OrbitalForge.ServiceMesh.Core.Rpc;
+using System.Net;
+using System.Net.Http;
 
 namespace OrbitalForge.ServiceMesh.Client
 {
@@ -13,9 +15,9 @@ namespace OrbitalForge.ServiceMesh.Client
         {
             Console.WriteLine("Hello World!");
             Console.WriteLine(typeof(OrbitalForge.ServiceMesh.Core.Rpc.ServiceMesh.ServiceMeshClient));
-            Channel channel = new Channel("172.17.0.2:50051", ChannelCredentials.Insecure);
+            Channel channel = new Channel("172.17.0.2:80", ChannelCredentials.Insecure);
             var client = new Core.Rpc.ServiceMesh.ServiceMeshClient(channel);
-            // RunEventClient(client).Wait();
+
             Task.WaitAll(
                 RunEventClientOnSameStream(0, client), 
                 RunEventClientOnSameStream(1, client), 
@@ -44,6 +46,8 @@ namespace OrbitalForge.ServiceMesh.Client
                     var source = new CancellationTokenSource();
                     var task = eventStream.ResponseStream.MoveNext(source.Token);
                     source.CancelAfter(TimeSpan.FromMilliseconds(50));
+
+                    HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://www.google.com"));
 
                     if(await task) 
                     {

@@ -1,31 +1,29 @@
-﻿using System;
-using System.IO;
-using System.Net;
-using System.Net.Sockets;
-using Grpc.Core;
-
-namespace OrbitalForge.ServiceMesh.Server
+﻿namespace OrbitalForge.ServiceMesh.Server.HttpTunnel
 {
+    using System;
+    using System.IO;
+    using System.Net;
+    using System.Net.Sockets;
+    using Grpc.Core;
+
     class Program
     {
         static void Main(string[] args)
         {
-            Run();
+            Run(80);
         }
 
-        private static void Run()
+        private static void Run(int port)
         {
-            const int Port = 50051;
-
             Grpc.Core.Server server = new Grpc.Core.Server
             {
                 Services = { Core.Rpc.ServiceMesh.BindService(new Core.ServiceMeshServer()) },
-                Ports = { new ServerPort(GetLocalIPAddress(), Port, ServerCredentials.Insecure) }
+                Ports = { new ServerPort(GetLocalIPAddress(), port, ServerCredentials.Insecure) }
             };
 
             server.Start();
 
-            Console.WriteLine("RouteGuide server listening on port " + Port);
+            Console.WriteLine("HTTP Relay Server listening on port " + port);
             Console.WriteLine(GetLocalIPAddress());
             Console.WriteLine("Press Ctrl-C to stop the server...");
             
