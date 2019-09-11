@@ -26,24 +26,24 @@ namespace OrbitalForge.ServiceMesh.HttpListener
 
         public async Task RunAsync(CancellationToken cancellationToken)
         {
-            // var sendHeartBeat = Task.Factory.StartNew(async () => {
+            var sendHeartBeat = Task.Factory.StartNew(async () => {
                 
-            //         while(true) 
-            //         {
-            //             using(var eventStream = serviceMesh.EventStream()) 
-            //             {
-            //                 await InitAsync(eventStream, false);
+                    while(true) 
+                    {
+                        using(var eventStream = serviceMesh.EventStream()) 
+                        {
+                            await InitAsync(eventStream, false);
 
-            //                 Console.WriteLine("Sending Heartbeat ...");
+                            Console.WriteLine("Sending Heartbeat ...");
 
-            //                 await eventStream.RequestStream.WriteAsync(new StreamingMessage() {
-            //                     WorkerHeartbeat = new WorkerHeartbeat(),
-            //                     RequestId = Guid.NewGuid().ToString()
-            //                 });
-            //             }
-            //             await Task.Delay(TimeSpan.FromSeconds(5));
-            //         }
-            // }, cancellationToken);
+                            await eventStream.RequestStream.WriteAsync(new StreamingMessage() {
+                                WorkerHeartbeat = new WorkerHeartbeat(),
+                                RequestId = Guid.NewGuid().ToString()
+                            });
+                        }
+                        await Task.Delay(TimeSpan.FromSeconds(5));
+                    }
+            }, cancellationToken);
                 
             while(!cancellationToken.IsCancellationRequested) 
             {

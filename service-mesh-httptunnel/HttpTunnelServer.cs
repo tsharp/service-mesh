@@ -8,14 +8,17 @@ namespace OrbitalForge.ServiceMesh.Server.HttpTunnel
     {
         private Random random = new Random();
 
-        private ConcurrentDictionary<int, Core.ServiceMeshWorker> workers = new ConcurrentDictionary<int, Core.ServiceMeshWorker>();
+        private ConcurrentDictionary<int, Core.ServiceMeshWorker> registeredWorkers = new ConcurrentDictionary<int, Core.ServiceMeshWorker>();
+
+        private ConcurrentStack<Core.ServiceMeshWorker> freeWorkers = new ConcurrentStack<Core.ServiceMeshWorker>();
 
         protected override Task RegisterWorkerAsync(Core.ServiceMeshWorker worker)
         {
             if(worker.IsListener) 
             {
-                workers.TryAdd(worker.GetHashCode(), worker);
-                Console.WriteLine($"++ Worker Added {""}:{workers.Count}");
+                registeredWorkers.TryAdd(worker.GetHashCode(), worker);
+                freeWorkers.Push(worker);
+                Console.WriteLine($"+ Worker Added {""}:{registeredWorkers.Count}");
             }
 
             return Task.CompletedTask;
@@ -23,10 +26,10 @@ namespace OrbitalForge.ServiceMesh.Server.HttpTunnel
 
         protected override Task UnRegisterWorkerAsync(Core.ServiceMeshWorker worker)
         {
-            if( worker.IsListener &&
-                workers.TryRemove(worker.GetHashCode(), out Core.ServiceMeshWorker removedWorker))
+            if(worker.IsListener)
             {
-                Console.WriteLine($"-- Worker Removed {""}:{workers.Count}");
+                registeredWorkers.TryRemove(worker.GetHashCode(), out Core.ServiceMeshWorker unregistered);
+                Console.WriteLine($"- Worker Removed {""}:{registeredWorkers.Count}");
             }
 
             return Task.CompletedTask;
@@ -37,31 +40,32 @@ namespace OrbitalForge.ServiceMesh.Server.HttpTunnel
             System.Diagnostics.Stopwatch timer = new System.Diagnostics.Stopwatch();
             timer.Start();
 
-            while(workers.IsEmpty) 
+            Core.ServiceMeshWorker worker = null;
+
+            while(!freeWorkers.TryPop(out worker))
             {
+                // Wait 10ms before trying to find a worker
+                await Task.Delay(10);
+
                 if(timer.Elapsed.TotalSeconds >= 30)
                 {
                     throw new TimeoutException("Unable to connect to listener.");
                 }
             }
 
-            var workerIndex = random.Next(workers.Count - 1);
-            
-            try {
-                Console.WriteLine($"Selected Worker Index: {workerIndex}");
-
-                await workers.ToArray()[workerIndex].Value.SendRequestAsync(new Core.Rpc.StreamingMessage(){
-                    RequestId = $"http:{Guid.NewGuid().ToString()}"
-                });
-            } catch(Exception ex) {
-                Console.WriteLine(ex);
+            if(worker == null) {
+                throw new Exception("PANIC: Worker not found!");
             }
 
-            return new Core.Rpc.StreamingMessage(){
-                RequestId = $"http:{Guid.NewGuid().ToString()}"
-            };
-
-            
+            try 
+            {
+                // Since these may be out of order - this needs to be synchronized.
+                return await worker.SendRequestAsync(message.Clone());
+            } 
+            finally 
+            {
+                freeWorkers.Push(worker);
+            }        
         }
     }
 

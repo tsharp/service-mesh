@@ -1,6 +1,7 @@
 namespace OrbitalForge.ServiceMesh.Core
 {
     using System;
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Linq;
     using System.Reflection;
@@ -17,6 +18,8 @@ namespace OrbitalForge.ServiceMesh.Core
 
         private readonly IAsyncStreamReader<Core.Rpc.StreamingMessage> requestStream;
         private readonly IServerStreamWriter<Core.Rpc.StreamingMessage> responseStream;
+
+        private ConcurrentStack<Core.Rpc.StreamingMessage> responses = new ConcurrentStack<Core.Rpc.StreamingMessage>();
 
         public IReadOnlyDictionary<string, string> Capabilities { get; private set; }
 
@@ -60,15 +63,30 @@ namespace OrbitalForge.ServiceMesh.Core
                 WorkerInitResponse = repsonse
             });    
 
-            isInitialized = true;      
+            isInitialized = true;  
+
+            Console.WriteLine("Worker Initialized.");    
         }
 
         public async Task<Core.Rpc.StreamingMessage> SendRequestAsync(Core.Rpc.StreamingMessage request) 
         {
             // Since these may be out of order - this needs to be synchronized.
             await responseStream.WriteAsync(request);
-            await requestStream.MoveNext(CancellationToken.None);
-            return requestStream.Current;
+
+            Core.Rpc.StreamingMessage response = null;
+
+            Console.WriteLine("Lets wait for a message ...");
+
+            while(!responses.TryPop(out response)) 
+            {
+                Console.WriteLine("zz Awaiting Response ...");
+                await Task.Delay(10);
+            }
+
+
+            Console.WriteLine("zz Response Returned...");
+
+            return response;
         }
 
         public async Task RunAsync(Func<Core.Rpc.StreamingMessage, Task<Core.Rpc.StreamingMessage>> messageCallback)
@@ -86,18 +104,27 @@ namespace OrbitalForge.ServiceMesh.Core
                     continue;
                 }
 
-                await responseStream.WriteAsync(await messageCallback(requestStream.Current));
+                if(!IsListener) 
+                {
+                    var result = await messageCallback.Invoke(requestStream.Current);
+                    await responseStream.WriteAsync(result);
+                    continue;
+                }
+            
+                Console.WriteLine("aa Recieved Response ...");
+
+                responses.Push(requestStream.Current.Clone());
+
+                Console.WriteLine("aa Response Queued ...");
             }
 
-            // var source = new CancellationTokenSource();
-            // var task = requestStream.MoveNext(source.Token);
-            // source.CancelAfter(TimeSpan.FromMilliseconds(MaxWait));
+            Console.WriteLine("aa Exiting Node.");
 
-            // while(await task) 
-            // {
-            //     task = requestStream.MoveNext(source.Token);
-            //     source.CancelAfter(TimeSpan.FromMilliseconds(MaxWait));
-            // }
+            // var sender = Task.Factory.StartNew(() => {
+                
+            // });
+
+            // await Task.WhenAll(listener, sender);
         }
     }
 }

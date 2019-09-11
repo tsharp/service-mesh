@@ -18,11 +18,11 @@
             var client = new Core.Rpc.ServiceMesh.ServiceMeshClient(channel);
 
             Task.WaitAll(
-                RunEventClientOnSameStream(0, client), 
+                RunEventClientOnSameStream(0, client) /*, 
                 RunEventClientOnSameStream(1, client), 
                 RunEventClientOnSameStream(2, client),
                 RunEventClientOnSameStream(3, client),
-                RunEventClientOnSameStream(4, client));
+                RunEventClientOnSameStream(4, client) */);
         }
 
         private static async Task RunEventClient(Core.Rpc.ServiceMesh.ServiceMeshClient client) 
