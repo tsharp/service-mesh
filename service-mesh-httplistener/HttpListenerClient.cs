@@ -16,6 +16,8 @@ namespace OrbitalForge.ServiceMesh.HttpListener
 
         const int MaxWait = 5;
 
+        private int messagesProcessed = 0;
+
         private readonly Core.Rpc.ServiceMesh.ServiceMeshClient serviceMesh;
 
         public HttpListenerClient(string ipAddress, int port) 
@@ -26,39 +28,46 @@ namespace OrbitalForge.ServiceMesh.HttpListener
 
         public async Task RunAsync(CancellationToken cancellationToken)
         {
-            var sendHeartBeat = Task.Factory.StartNew(async () => {
-                
-                    while(true) 
-                    {
-                        using(var eventStream = serviceMesh.EventStream()) 
-                        {
-                            await InitAsync(eventStream, false);
+            using(var eventStream = serviceMesh.EventStream()) 
+            {
+                await InitAsync(eventStream);
 
+                var sendHeartBeat = Task.Factory.StartNew(async () => {
+                        while(true) 
+                        {
                             Console.WriteLine("Sending Heartbeat ...");
 
                             await eventStream.RequestStream.WriteAsync(new StreamingMessage() {
                                 WorkerHeartbeat = new WorkerHeartbeat(),
                                 RequestId = Guid.NewGuid().ToString()
                             });
-                        }
-                        await Task.Delay(TimeSpan.FromSeconds(5));
-                    }
-            }, cancellationToken);
-                
-            while(!cancellationToken.IsCancellationRequested) 
-            {
-                using(var eventStream = serviceMesh.EventStream()) 
-                {
-                    await InitAsync(eventStream, true);
 
+                            Console.WriteLine($"Messages Processed: {messagesProcessed}");
+                            await Task.Delay(TimeSpan.FromSeconds(5));
+                        }
+                }, cancellationToken);
+                
+                while(!cancellationToken.IsCancellationRequested) 
+                {
                     try {
                         // Wait For Event
                         await eventStream.ResponseStream.MoveNext(cancellationToken);
 
                         // Process Message
+                        if(eventStream.ResponseStream.Current.ContentCase != StreamingMessage.ContentOneofCase.InvocationRequest)
+                        {
+                            throw new Exception("Was expecing an invocation.");
+                        }
 
                         // Send Response
-                        await eventStream.RequestStream.WriteAsync(new StreamingMessage());
+                        await eventStream.RequestStream.WriteAsync(new StreamingMessage(){
+                            RequestId = eventStream.ResponseStream.Current.RequestId,
+                            InvocationResponse = new InvocationResponse() {
+                                InvocationId = eventStream.ResponseStream.Current.InvocationRequest.InvocationId
+                            }
+                        });
+
+                        messagesProcessed++;
                     } catch(Exception ex) {
                         Console.WriteLine(ex.ToString());
                     }
@@ -66,82 +75,29 @@ namespace OrbitalForge.ServiceMesh.HttpListener
             }
         }
 
-        private static async Task InitAsync(AsyncDuplexStreamingCall<StreamingMessage, StreamingMessage> eventStream, bool isListener) 
+        private static async Task InitAsync(AsyncDuplexStreamingCall<StreamingMessage, StreamingMessage> eventStream) 
         {
-            var setupMessage = new StreamingMessage() {
-                WorkerInitRequest = new WorkerInitRequest()
-            };
+            await eventStream.RequestStream.WriteAsync(new StreamingMessage() {
+                StartStream = new StartStream() {
+                    WorkerId = Guid.NewGuid().ToString()
+                }
+            });
 
-            if(isListener) {
-                setupMessage.WorkerInitRequest.Capabilities.Add("Listener", "true");
-            }
-
-            setupMessage.WorkerInitRequest.HostVersion = Assembly.GetExecutingAssembly().FullName;
-
-            await eventStream.RequestStream.WriteAsync(setupMessage);
-
-            // Since we're not queueing the data corectly ... we actually run into an issue where we've queued the client before it's fully ready.
-            // TODO: Fixme
             await eventStream.ResponseStream.MoveNext(CancellationToken.None);
+
+            if(eventStream.ResponseStream.Current.ContentCase != StreamingMessage.ContentOneofCase.WorkerInitRequest)
+            {
+                throw new Exception("Was expecing an init request.");
+            }
+
+            Console.WriteLine($"Server Version: {eventStream.ResponseStream.Current.WorkerInitRequest.HostVersion}");
             
-            if(eventStream.ResponseStream.Current.ContentCase != StreamingMessage.ContentOneofCase.WorkerInitResponse)
-            {
-                throw new Exception("Was expecing an init response.");
-            }
-
-            if (eventStream.ResponseStream.Current.WorkerInitResponse.Result.Status != Core.Rpc.StatusResult.Types.Status.Success) 
-            {
-                throw new Exception(eventStream.ResponseStream.Current.WorkerInitResponse.Result.Exception.Message);
-            }
-        }
-
-        private static async Task RunEventClientOnSameStream(int id, Core.Rpc.ServiceMesh.ServiceMeshClient client) 
-        {
-            using(var eventStream = client.EventStream()) 
-            {
-                
-
-                for(int count = 0; count < 10000; count++) {
-                    var message = new StreamingMessage();
-
-                    message.RequestId = $"{id}:{count}";
-                    await eventStream.RequestStream.WriteAsync(message);
-
-                    var source = new CancellationTokenSource();
-                    var task = eventStream.ResponseStream.MoveNext(source.Token);
-                    source.CancelAfter(TimeSpan.FromMilliseconds(50));
-
-                    HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://www.google.com"));
-
-                    if(await task) 
-                    {
-                        Console.WriteLine($"Response: {eventStream.ResponseStream.Current.RequestId}");
-                    } else {
-                        Console.WriteLine("Response Not Recieved In A Timely Manner!");
-                        throw new TimeoutException();
-                    }
+            // Complete initialization
+            await eventStream.RequestStream.WriteAsync(new StreamingMessage() {
+                WorkerInitResponse = new WorkerInitResponse() {
+                    WorkerVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString()
                 }
-
-                await eventStream.RequestStream.CompleteAsync();
-            }
-        }
-
-        private static async Task SendMessage(Core.Rpc.ServiceMesh.ServiceMeshClient client, int count) 
-        {
-            using(var eventStream = client.EventStream()) 
-            {
-                var message = new StreamingMessage();
-                message.RequestId = count.ToString();
-                await eventStream.RequestStream.WriteAsync(message);
-                var responseRecieved = await eventStream.ResponseStream.MoveNext();
-
-                if(responseRecieved) 
-                {
-                    Console.WriteLine($"Response: {eventStream.ResponseStream.Current.RequestId}");
-                }
-
-                await eventStream.RequestStream.CompleteAsync();
-            }
+            });
         }
     }
 }

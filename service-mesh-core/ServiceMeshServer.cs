@@ -5,14 +5,19 @@ namespace OrbitalForge.ServiceMesh.Core
     using System.Threading;
     using System.Threading.Tasks;
     using Grpc.Core;
+    using OrbitalForge.ServiceMesh.Core.Rpc;
 
-    public class ServiceMeshServer : Rpc.ServiceMesh.ServiceMeshBase
+    public class ServiceMeshServer : Rpc.ServiceMesh.ServiceMeshBase, IServiceMeshWorker
     {
         private int connectedWorkers = 0;
 
+        public int ProcessedMessages { get; private set; } = 0;
+
         public virtual int ConnectedWorkers { get => connectedWorkers; }
 
-        private ConcurrentQueue<ServiceMeshWorker> workers = new ConcurrentQueue<ServiceMeshWorker>();
+        private ConcurrentDictionary<string, Core.ServiceMeshWorker> registeredWorkers = new ConcurrentDictionary<string, Core.ServiceMeshWorker>();
+
+        private ConcurrentQueue<Core.ServiceMeshWorker> workers = new ConcurrentQueue<Core.ServiceMeshWorker>();
 
         public override async Task EventStream(IAsyncStreamReader<Core.Rpc.StreamingMessage> requestStream, IServerStreamWriter<Core.Rpc.StreamingMessage> responseStream, ServerCallContext context) 
         {
@@ -24,38 +29,61 @@ namespace OrbitalForge.ServiceMesh.Core
             {
                 await worker.InitAsync();
 
-                await RegisterWorkerAsync(worker);
+                RegisterWorker(worker);
 
-                await worker.RunAsync(OnMessage);
+                await worker.RunAsync();
             }
             finally
             {
                 Interlocked.Decrement(ref connectedWorkers);
 
-                await UnRegisterWorkerAsync(worker);
+                UnRegisterWorker(worker);
             }
         }
 
-        // TODO: Implement Keep-Alive Ping
-
-        // TODO: Implement Is Healthy Check
-
-        protected virtual Task RegisterWorkerAsync(ServiceMeshWorker worker) 
+        private void RegisterWorker(Core.ServiceMeshWorker worker)
         {
-            return Task.CompletedTask;
+            registeredWorkers.TryAdd(worker.WorkerId, worker);
+            workers.Enqueue(worker);
+            Console.WriteLine($"+ Worker Added {""}:{registeredWorkers.Count}");
         }
 
-        protected virtual Task UnRegisterWorkerAsync(ServiceMeshWorker worker) 
+        private void UnRegisterWorker(Core.ServiceMeshWorker worker)
         {
-            return Task.CompletedTask;
+            registeredWorkers.TryRemove(worker.WorkerId, out Core.ServiceMeshWorker unregistered);
+            Console.WriteLine($"- Worker Removed {""}:{registeredWorkers.Count}");
         }
 
-        protected virtual Task<Core.Rpc.StreamingMessage> OnMessage(Core.Rpc.StreamingMessage message) 
+        private async Task<Core.ServiceMeshWorker> AcquireWorkerAsync()
         {
-            Console.WriteLine(message.RequestId);
-            return Task.FromResult(new Core.Rpc.StreamingMessage(){
-                RequestId = $"base:{Guid.NewGuid().ToString()}"
-            });
+            Core.ServiceMeshWorker worker;
+
+            while(!workers.TryDequeue(out worker)) {
+                await Task.Delay(5);
+            }
+
+            return worker;
+        }
+
+        private void ReleaseWorker(Core.ServiceMeshWorker worker)
+        {
+            workers.Enqueue(worker);
+        }
+
+        public async Task<StreamingMessage> SendRequestAsync(StreamingMessage request)
+        {
+            var worker = await AcquireWorkerAsync();
+
+            try 
+            {
+                var response = await worker.SendRequestAsync(request);
+                ProcessedMessages++;
+                return response;
+            } 
+            finally
+            {
+                ReleaseWorker(worker);
+            }
         }
     }
 }

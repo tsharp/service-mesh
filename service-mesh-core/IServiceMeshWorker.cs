@@ -6,6 +6,6 @@ namespace OrbitalForge.ServiceMesh.Core
     
     internal interface IServiceMeshWorker 
     {
-        Task InitiateWorkerAsync();
+        Task<Core.Rpc.StreamingMessage> SendRequestAsync(Core.Rpc.StreamingMessage request);
     }
 }
