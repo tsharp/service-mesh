@@ -3,15 +3,15 @@ mono: none
 dotnet: 2.1.502
 sudo: false
 
-solution: service-mesh.sln
+solution: src/csharp/service-mesh.sln
 
 install:
- - dotnet restore service-mesh.sln
+ - dotnet restore src/csharp/service-mesh.sln
 # - nuget install xunit.runners -Version 1.9.2 -OutputDirectory testrunner
 
 script:
- - dotnet build
- - dotnet test
+ - dotnet build src/csharp/service-mesh.sln
+ - dotnet test src/csharp/service-mesh.sln
 
 # safelist
 branches:
