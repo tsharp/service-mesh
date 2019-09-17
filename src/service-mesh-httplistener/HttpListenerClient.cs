@@ -9,6 +9,8 @@ namespace OrbitalForge.ServiceMesh.HttpListener
     using System.Net.Http;
     using System.Reflection;
     using System.Collections.Concurrent;
+    using System.Diagnostics;
+    using Google.Protobuf;
 
     internal class HttpListenerClient
     {
@@ -18,7 +20,11 @@ namespace OrbitalForge.ServiceMesh.HttpListener
 
         private int messagesProcessed = 0;
 
+        private double elapsedMilliseconds = 0;
+
         private readonly Core.Rpc.ServiceMesh.ServiceMeshClient serviceMesh;
+
+        private Random randomGenerator = new Random();
 
         public HttpListenerClient(string ipAddress, int port) 
         {
@@ -42,7 +48,7 @@ namespace OrbitalForge.ServiceMesh.HttpListener
                                 RequestId = Guid.NewGuid().ToString()
                             });
 
-                            Console.WriteLine($"Messages Processed: {messagesProcessed}");
+                            Console.WriteLine($"Messages Processed: {messagesProcessed} - TTR: {elapsedMilliseconds/(double)messagesProcessed}");
                             await Task.Delay(TimeSpan.FromSeconds(5));
                         }
                 }, cancellationToken);
@@ -53,19 +59,35 @@ namespace OrbitalForge.ServiceMesh.HttpListener
                         // Wait For Event
                         await eventStream.ResponseStream.MoveNext(cancellationToken);
 
+                        Stopwatch timer = new Stopwatch();
+                        timer.Start();
+
                         // Process Message
                         if(eventStream.ResponseStream.Current.ContentCase != StreamingMessage.ContentOneofCase.InvocationRequest)
                         {
                             throw new Exception("Was expecing an invocation.");
                         }
 
+                        // SEND 2mb
+                        byte[] randomBytes = new byte[1024 * 1024 * 2];
+                        randomGenerator.NextBytes(randomBytes);
+
                         // Send Response
                         await eventStream.RequestStream.WriteAsync(new StreamingMessage(){
                             RequestId = eventStream.ResponseStream.Current.RequestId,
                             InvocationResponse = new InvocationResponse() {
-                                InvocationId = eventStream.ResponseStream.Current.InvocationRequest.InvocationId
+                                InvocationId = eventStream.ResponseStream.Current.InvocationRequest.InvocationId,
+                                Result = new StatusResult() {
+                                    Status = StatusResult.Types.Status.Success
+                                },
+                                ReturnValue = new TypedData() {
+                                    Stream = ByteString.CopyFrom(randomBytes)
+                                }
                             }
                         });
+
+                        timer.Stop();
+                        elapsedMilliseconds += timer.ElapsedMilliseconds;
 
                         messagesProcessed++;
                     } catch(Exception ex) {

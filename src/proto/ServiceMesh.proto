@@ -6,7 +6,7 @@ option java_package = "com.orbitalforge.servicemesh.core.rpc";
 option java_outer_classname = "MeshProto";
 option csharp_namespace ="OrbitalForge.ServiceMesh.Core.Rpc";
 
-package MeshRpcMessages;
+package ServiceMesh;
 
 // Interface exported by the server.
 service ServiceMesh {
